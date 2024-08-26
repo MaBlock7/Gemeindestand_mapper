@@ -1,6 +1,6 @@
-# Overview
+# Municipality Data Mapping
 
-This is a tool to retrieve data on the municipality mutations and mapping tables from older municipality states (Gemeindestände) to newer ones.
+This project automates the retrieval and processing of Swiss municipality state data (Gemeindestände) from the REST API provided by the Swiss Federal Statistical Office.
 
 # Project Setup
 ```
@@ -31,7 +31,7 @@ GEMEINDESTAND_MAPPER
 ## Initial Venv Setup (only required once)
 
 ```shell
-cd Gemeindestand_mapper
+cd gemeindestand_mapper
 
 python3 -m venv .venv
 ```

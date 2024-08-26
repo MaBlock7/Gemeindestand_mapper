@@ -1,6 +1,4 @@
-# Municipality Data Mapping
-
-This project automates the retrieval and processing of Swiss municipality state data (Gemeindestände) from the REST API provided by the Swiss Federal Statistical Office.
+# Overview
 
 - **Data Source**: [Swiss Federal Statistical Office API](https://www.agvchapp.bfs.admin.ch/de/mutated-communes/query)
 - **Data Storage**: Processed data is saved in the `processed_data/snapshots` directory. Municipality counts for all states are stored in `src/utils/data/anzahl_gmde_pro_stand.csv`.
@@ -38,15 +36,15 @@ options:
 
 #### **Examples**
 
-- Retrieve all states from a specific start date:
+- Retrieve all from 01-01-1981 to today (default setting)
 
 ```shell
-python update_utils_data.py -sp '01-01-1981'
-Retrieve states within a specific date range:
+python update_utils_data.py
 ```
 
+- Retrieve states within a specific date range:
+
 ```shell
-Code kopieren
 python update_utils_data.py -sp '01-01-2023' -ep '28-02-2024'
 ```
 

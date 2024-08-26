@@ -1,6 +1,9 @@
+import asyncio
+import aiohttp
 from datetime import datetime
 from pathlib import Path
 
+import io
 import pandas as pd
 
 from utils.api import COUNT_GMDE_COL, GMDE_STAND_COL
@@ -148,26 +151,61 @@ class GemeindeMapper:
         except ValueError as e:
             raise e
 
-    def create_mapping(self, origin: str,
-                       target: str) -> pd.DataFrame:
-        """Creates a DataFrame with two columns to map the new
-           Gemeindestand on to the old one.
+    async def fetch_mapping(self, session, origin: str, target: str) -> pd.DataFrame:
+        url = f"{API_PATH}correspondances?includeUnmodified=true&includeTerritoryExchange=false&startPeriod={origin}&endPeriod={target}"
+        async with session.get(url) as response:
+            response.raise_for_status()
+            data = await response.text()
+            mapping = pd.read_csv(io.StringIO(data))
+            return mapping
 
-        Parameters:
-        -----------
-        origin: str
-            The date string of the old Gemeindestand.
+    async def create_mapping(self, origin: str, target: str, export: bool = False) -> pd.DataFrame:
+        async with aiohttp.ClientSession() as session:
+            mapping = await self.fetch_mapping(session, origin, target)
+            if export:
+                mapping.to_excel(TARGET_PATH / f'mapping_{origin}_{target}.xlsx', index=False)
+            return mapping
 
-        target: str
-            The date string of the new Gemeindestand.
+    async def create_multi_mapping(self, origin: str, targets: list[str]) -> pd.DataFrame:
+        print("Creating the mapping. This might take some time...")
+        targets.append(origin)
+        date_strings = sorted([datetime.strptime(date, "%d-%m-%Y") for date in set(targets)])
+        earliest_date = date_strings[0]
+        targets = date_strings[1:]
 
-        Returns:
-        --------
-        pd.DataFrame
-        """
-        url = f"{API_PATH}correspondances?includeUnmodified=true&includeTerritoryExchange=false&startPeriod={origin}&endPeriod={target}"  # noqa
-        mapping = self.load_data(url, 'csv')
-        return mapping
+        tasks = []
+        connector = aiohttp.TCPConnector(limit=100)  # Increase the limit to allow more concurrent connections
+        async with aiohttp.ClientSession(connector=connector) as session:
+            for target in targets:
+                tasks.append(self.fetch_mapping(session, earliest_date.strftime("%d-%m-%Y"), target.strftime("%d-%m-%Y")))
+
+            mappings = await asyncio.gather(*tasks)
+
+        # Process the mappings as before
+        full_mapping = None
+        for i, mapping in enumerate(mappings):
+            target = targets[i].strftime("%d-%m-%Y")
+            mapping = mapping[['InitialCode', 'InitialName', 'TerminalCode', 'TerminalName']]
+            mapping.columns = [
+                f'bfs_gmde_nummer_{earliest_date.strftime("%d-%m-%Y")}',
+                f'bfs_gmde_name_{earliest_date.strftime("%d-%m-%Y")}',
+                f'bfs_gmde_nummer_{target}',
+                f'bfs_gmde_name_{target}'
+            ]
+
+            if full_mapping is None:
+                full_mapping = mapping
+            else:
+                full_mapping = full_mapping.merge(
+                    mapping,
+                    left_on=[f'bfs_gmde_nummer_{earliest_date.strftime("%d-%m-%Y")}', f'bfs_gmde_name_{earliest_date.strftime("%d-%m-%Y")}'],
+                    right_on=[f'bfs_gmde_nummer_{earliest_date.strftime("%d-%m-%Y")}', f'bfs_gmde_name_{earliest_date.strftime("%d-%m-%Y")}'],
+                    how='left'
+                )
+
+            earliest_date = targets[i]
+
+        return full_mapping
 
     def map_gemeindestand(self, df: pd.DataFrame,
                           column_name: str, **kwargs: str) -> pd.DataFrame:
@@ -203,12 +241,75 @@ class GemeindeMapper:
 
         mapping = self.create_mapping(origin, target)
         mapping = mapping.rename(columns={'InitialCode': column_name,
-                                          'TerminalCode': 'gmde_stand_new',
-                                          'TerminalName': 'gmde_name_new'})
+                                          'TerminalCode': f'gmde_stand_{target[-4:]}',
+                                          'TerminalName': f'gmde_name_{target[-4:]}'})
 
         print(f"Mapped DataFrame from {origin} to {target} Gemeindestand.")
         return df.merge(
-            mapping[[column_name, 'gmde_stand_new', 'gmde_name_new']],
+            mapping[[column_name, f'gmde_stand_{target[-4:]}', f'gmde_name_{target[-4:]}']],
             on=column_name,
-            how='right'
+            how='outer'
         )
+
+def create_mapping(self, origin: str,
+                    target: str, export: bool = False) -> pd.DataFrame:
+    """Creates a DataFrame with two columns to map the new
+        Gemeindestand on to the old one.
+
+    Parameters:
+    -----------
+    origin: str
+        The date string of the old Gemeindestand. (`dd-mm-YYYY`)
+
+    target: str
+        The date string of the new Gemeindestand. (`dd-mm-YYYY`)
+
+    Returns:
+    --------
+    pd.DataFrame
+    """
+    url = f"{API_PATH}correspondances?includeUnmodified=true&includeTerritoryExchange=false&startPeriod={origin}&endPeriod={target}"  # noqa
+    mapping = self.load_data(url, 'csv')
+    if export:
+        mapping.to_excel(TARGET_PATH / f'mapping_{origin}_{target}.xlsx', index=False)
+    return mapping
+
+def create_multi_mapping(self, origin: str, targets: list[str]) -> pd.DataFrame:
+    # Ensure origin is included in the targets list for consistent processing
+    targets.append(origin)
+
+    # Convert strings to datetime objects and sort the dates
+    date_strings = sorted([datetime.strptime(date, "%d-%m-%Y") for date in set(targets)])
+
+    # Initialize the earliest date and the remaining targets
+    earliest_date = date_strings[0]
+    targets = date_strings[1:]
+
+    # Initialize an empty DataFrame to store the final mapping
+    full_mapping = pd.DataFrame()
+
+    for target in targets:
+        # Create a mapping for each date pair
+        temp_mapping = self.create_mapping(earliest_date.strftime("%d-%m-%Y"), target.strftime("%d-%m-%Y"), export=False)
+
+        # Select and rename the necessary columns
+        temp_mapping = temp_mapping[['InitialCode', 'InitialName', 'TerminalCode', 'TerminalName']]
+        temp_mapping.columns = [f'bfs_gmde_nummer_{earliest_date.strftime("%d-%m-%Y")}', 
+                                f'bfs_gmde_name_{earliest_date.strftime("%d-%m-%Y")}', 
+                                f'bfs_gmde_nummer_{target.strftime("%d-%m-%Y")}', 
+                                f'bfs_gmde_name_{target.strftime("%d-%m-%Y")}']
+
+        if full_mapping.empty:
+            # If the full mapping is empty, start with the first temp_mapping
+            full_mapping = temp_mapping
+        else:
+            # Merge the current temp_mapping with the full mapping
+            full_mapping = full_mapping.merge(temp_mapping, 
+                                            left_on=[f'bfs_gmde_nummer_{earliest_date.strftime("%d-%m-%Y")}', f'bfs_gmde_name_{earliest_date.strftime("%d-%m-%Y")}'], 
+                                            right_on=[f'bfs_gmde_nummer_{earliest_date.strftime("%d-%m-%Y")}', f'bfs_gmde_name_{earliest_date.strftime("%d-%m-%Y")}'],
+                                            how='left')
+
+        # Update the earliest date to the current target for the next iteration
+        earliest_date = target
+
+    return full_mapping

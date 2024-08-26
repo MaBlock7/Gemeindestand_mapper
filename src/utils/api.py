@@ -4,7 +4,7 @@ import argparse
 import pandas as pd
 import pickle
 
-TARGET_PATH = Path('../processed_data/')
+TARGET_PATH = Path('../../processed_data/')
 API_PATH = 'https://sms.bfs.admin.ch/WcfBFSSpecificService.svc/AnonymousRest/communes/'  # noqa
 
 # Constants for column names
@@ -74,7 +74,7 @@ def create_snapshots(gmde_stand_dates: list) -> None:
                          f'gemeindestand_{date_obj}.csv', index=False)
         gmde_dct[gmde_stand_date] = snapshots['Identifier'].to_list()
 
-    count_df.to_csv(TARGET_PATH / 'anzahl_gmde_pro_stand.csv', index=False)
+    count_df.to_csv(TARGET_PATH / 'anzahl_gmde_pro_stand.csv', index=False, mode='a')
 
     with open(TARGET_PATH / 'gemeindestaende.pkl', 'wb') as outfile:
         pickle.dump(gmde_dct, outfile)

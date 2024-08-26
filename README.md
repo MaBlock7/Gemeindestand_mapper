@@ -30,13 +30,12 @@ GEMEINDESTAND_MAPPER
 ```shell
 cd Gemeindestand_mapper
 
-conda deactivate
-
-python3 -m venv .env
+python3 -m venv .venv
 ```
 
 ## Activate Environment
 
 ```shell
 source .env/bin/activate
+pip install -r requirements.txt
 ```

@@ -4,7 +4,7 @@ import argparse
 import pandas as pd
 import pickle
 
-TARGET_PATH = Path('../../processed_data/')
+TARGET_PATH = Path('./utils/data')
 API_PATH = 'https://sms.bfs.admin.ch/WcfBFSSpecificService.svc/AnonymousRest/communes/'  # noqa
 
 # Constants for column names
@@ -49,6 +49,8 @@ def create_snapshots(gmde_stand_dates: list) -> None:
     -----------
     gmde_stand_dates: list
         List of dates where the Gemeindestand changed.
+    get_missing: bool
+        If True, only retrieves the missing gemeindestände.
     """
     count_df = pd.DataFrame({GMDE_STAND_COL: [],
                              COUNT_GMDE_COL: []})
@@ -74,21 +76,23 @@ def create_snapshots(gmde_stand_dates: list) -> None:
                          f'gemeindestand_{date_obj}.csv', index=False)
         gmde_dct[gmde_stand_date] = snapshots['Identifier'].to_list()
 
-    count_df.to_csv(TARGET_PATH / 'anzahl_gmde_pro_stand.csv', index=False, mode='a')
+    if Path(TARGET_PATH / 'anzahl_gmde_pro_stand.csv').exists():
+        count_df.to_csv(TARGET_PATH / 'anzahl_gmde_pro_stand.csv', index=False, mode='a', header=False)
+    else:
+        count_df.to_csv(TARGET_PATH / 'anzahl_gmde_pro_stand.csv', index=False)
+
+    all_files = list(Path(TARGET_PATH / 'snapshots').glob('*.csv'))
+    gmde_dct = {}
+    for file in all_files:
+        df = pd.read_csv(file)
+        file_name = file.name.removesuffix('.csv')
+        date = f"{file_name[-2:]}-{file_name[-5:-3]}-{file_name[-10:-6]}"
+        gmde_dct[date] = df.Identifier.unique()
 
     with open(TARGET_PATH / 'gemeindestaende.pkl', 'wb') as outfile:
         pickle.dump(gmde_dct, outfile)
 
-
-def main(start_point: str, end_point: str):
-    gmde_stand_dates = get_gmde_stand_dates(start_point, end_point)
-    create_snapshots(gmde_stand_dates)
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-sp', '--start_point', default='01-01-1981')
-    parser.add_argument('-ep', '--end_point',
-                        default=str(datetime.today().strftime('%d-%m-%Y')))
-    args = parser.parse_args()
-    main(args.start_point, args.end_point)
+    # Clean up utils data
+    count_df = pd.read_csv(TARGET_PATH / 'anzahl_gmde_pro_stand.csv')
+    count_df = count_df.drop_duplicates()
+    count_df.to_csv(TARGET_PATH / 'anzahl_gmde_pro_stand.csv', index=False)

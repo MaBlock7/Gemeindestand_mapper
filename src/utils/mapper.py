@@ -6,17 +6,17 @@ from pathlib import Path
 import io
 import pandas as pd
 
-from utils.api import COUNT_GMDE_COL, GMDE_STAND_COL
+from utils.utils import COUNT_GMDE_COL, GMDE_STAND_COL
 
 # Constants
-CSV_FILE_PATH = Path('../processed_data/anzahl_gmde_pro_stand.csv')
-PKL_FILE_PATH = Path('../processed_data/gemeindestaende.pkl')
+CSV_FILE_PATH = Path('./data/anzahl_gmde_pro_stand.csv')
+PKL_FILE_PATH = Path('./data/gemeindestaende.pkl')
 TARGET_PATH = Path('../results')
-API_PATH = 'https://sms.bfs.admin.ch/WcfBFSSpecificService.svc/AnonymousRest/communes/'  # noqa
 
 
 class GemeindeMapper:
     def __init__(self):
+        self.api_path = 'https://sms.bfs.admin.ch/WcfBFSSpecificService.svc/AnonymousRest/communes/'  # noqa
         self.data = self.load_data(CSV_FILE_PATH, 'csv')
         self.gmde_dct = self.load_data(PKL_FILE_PATH, 'pickle')
 
@@ -152,7 +152,23 @@ class GemeindeMapper:
             raise e
 
     async def fetch_mapping(self, session, origin: str, target: str) -> pd.DataFrame:
-        url = f"{API_PATH}correspondances?includeUnmodified=true&includeTerritoryExchange=false&startPeriod={origin}&endPeriod={target}"
+        """Fetches the municipality mapping data from the API for a given origin and target date.
+
+        Parameters
+        ----------
+        session : aiohttp.ClientSession
+            An instance of `aiohttp.ClientSession` used to perform the HTTP request.
+        origin : str
+            The starting date of the mapping period in `dd-mm-YYYY` format.
+        target : str
+            The ending date of the mapping period in `dd-mm-YYYY` format.
+
+        Returns
+        -------
+        pd.DataFrame
+            A pandas DataFrame containing the municipality mapping data.
+        """
+        url = f"{self.api_path}correspondances?includeUnmodified=true&includeTerritoryExchange=false&startPeriod={origin}&endPeriod={target}"  # noqa
         async with session.get(url) as response:
             response.raise_for_status()
             data = await response.text()
@@ -160,13 +176,45 @@ class GemeindeMapper:
             return mapping
 
     async def create_mapping(self, origin: str, target: str, export: bool = False) -> pd.DataFrame:
+        """Creates a municipality mapping between two dates and optionally exports the result to an Excel file.
+
+        Parameters
+        ----------
+        origin : str
+            The starting date of the mapping period in `dd-mm-YYYY` format.
+        target : str
+            The ending date of the mapping period in `dd-mm-YYYY` format.
+        export : bool, optional
+            If True, the resulting DataFrame is exported to an Excel file (default is False).
+
+        Returns
+        -------
+        pd.DataFrame
+            A pandas DataFrame containing the municipality mapping data.
+        """
         async with aiohttp.ClientSession() as session:
             mapping = await self.fetch_mapping(session, origin, target)
             if export:
                 mapping.to_excel(TARGET_PATH / f'mapping_{origin}_{target}.xlsx', index=False)
             return mapping
 
-    async def create_multi_mapping(self, origin: str, targets: list[str]) -> pd.DataFrame:
+    async def create_multi_mapping(self, origin: str, targets: list[str], return_names: bool = True) -> pd.DataFrame:
+        """Creates a mapping for multiple target dates starting from a given origin date, merging the results.
+
+        Parameters
+        ----------
+        origin : str
+            The starting date of the mapping period in `dd-mm-YYYY` format.
+        targets : list of str
+            A list of target dates in `dd-mm-YYYY` format for which to create the mapping.
+        return_names : bool, optional
+            If True, the returned DataFrame includes the municipality names. If False, the name columns are dropped (default is True).
+
+        Returns
+        -------
+        pd.DataFrame
+            A pandas DataFrame containing the merged municipality mappings for all target dates.
+        """
         print("Creating the mapping. This might take some time...")
         targets.append(origin)
         date_strings = sorted([datetime.strptime(date, "%d-%m-%Y") for date in set(targets)])
@@ -174,7 +222,7 @@ class GemeindeMapper:
         targets = date_strings[1:]
 
         tasks = []
-        connector = aiohttp.TCPConnector(limit=100)  # Increase the limit to allow more concurrent connections
+        connector = aiohttp.TCPConnector(limit=20)  # Increase the limit to allow more concurrent connections
         async with aiohttp.ClientSession(connector=connector) as session:
             for target in targets:
                 tasks.append(self.fetch_mapping(session, earliest_date.strftime("%d-%m-%Y"), target.strftime("%d-%m-%Y")))
@@ -205,6 +253,8 @@ class GemeindeMapper:
 
             earliest_date = targets[i]
 
+        if not return_names:
+            return full_mapping.drop(columns=[col for col in full_mapping.columns if 'name' in mapping])
         return full_mapping
 
     def map_gemeindestand(self, df: pd.DataFrame,
@@ -241,33 +291,20 @@ class GemeindeMapper:
 
         mapping = self.create_mapping(origin, target)
         mapping = mapping.rename(columns={'InitialCode': column_name,
-                                          'TerminalCode': f'gmde_stand_{target[-4:]}',
-                                          'TerminalName': f'gmde_name_{target[-4:]}'})
+                                          'TerminalCode': f'gmde_stand_{target}',
+                                          'TerminalName': f'gmde_name_{target}'})
 
         print(f"Mapped DataFrame from {origin} to {target} Gemeindestand.")
         return df.merge(
-            mapping[[column_name, f'gmde_stand_{target[-4:]}', f'gmde_name_{target[-4:]}']],
+            mapping[[column_name, f'gmde_stand_{target}', f'gmde_name_{target}']],
             on=column_name,
             how='outer'
         )
 
+
+"""
 def create_mapping(self, origin: str,
                     target: str, export: bool = False) -> pd.DataFrame:
-    """Creates a DataFrame with two columns to map the new
-        Gemeindestand on to the old one.
-
-    Parameters:
-    -----------
-    origin: str
-        The date string of the old Gemeindestand. (`dd-mm-YYYY`)
-
-    target: str
-        The date string of the new Gemeindestand. (`dd-mm-YYYY`)
-
-    Returns:
-    --------
-    pd.DataFrame
-    """
     url = f"{API_PATH}correspondances?includeUnmodified=true&includeTerritoryExchange=false&startPeriod={origin}&endPeriod={target}"  # noqa
     mapping = self.load_data(url, 'csv')
     if export:
@@ -313,3 +350,4 @@ def create_multi_mapping(self, origin: str, targets: list[str]) -> pd.DataFrame:
         earliest_date = target
 
     return full_mapping
+"""

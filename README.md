@@ -31,7 +31,7 @@ GEMEINDESTAND_MAPPER
 ## Initial Venv Setup (only required once)
 
 ```shell
-cd Gemeindestand_mapper
+cd gemeindestand_mapper
 
 python3 -m venv .venv
 ```

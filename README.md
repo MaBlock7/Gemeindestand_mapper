@@ -7,21 +7,21 @@ This is a tool to retrieve data on the municipality mutations and mapping tables
 GEMEINDESTAND_MAPPER
 ├── .venv
 ├── raw
-│   ├── directions_bfs
-│   │   └── how_to_access_bfs_rest_api.pdf
-│   └── Gleiche Rechte für Mann und Frau.xlsx
+│   └── ...
 ├── results
-│   └── Abstimmung_1981_mapped.xlsx
+│   └── ...
 └── src
     ├── utils
-    │   ├── __init__.py
     │   ├── data
+    │   │   ├── directions_bfs
+    │   │   │   └── how_to_access_bfs_rest_api.pdf
     │   │   ├── snapshots
     │   │   │   └── ...
     │   │   ├── anzahl_gmde_pro_stand.csv
     │   │   └── gemeindestaende.pkl
-    │   ├── utils.py
-    │   └── mapper.py
+    │   └── utils.py
+    ├── mapper
+    │   └── gemeinde_mapper.py
     ├── gemeindestand_mapping.ipynb
     ├── file_formatter.ipynb
     ├── update_utils_data.py
@@ -31,7 +31,7 @@ GEMEINDESTAND_MAPPER
 ## Initial Venv Setup (only required once)
 
 ```shell
-cd gemeindestand_mapper
+cd Gemeindestand_mapper
 
 python3 -m venv .venv
 ```

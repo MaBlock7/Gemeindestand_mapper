@@ -9,8 +9,8 @@ import pandas as pd
 from utils.utils import COUNT_GMDE_COL, GMDE_STAND_COL
 
 # Constants
-CSV_FILE_PATH = Path('./data/anzahl_gmde_pro_stand.csv')
-PKL_FILE_PATH = Path('./data/gemeindestaende.pkl')
+CSV_FILE_PATH = Path('./utils/data/anzahl_gmde_pro_stand.csv')
+PKL_FILE_PATH = Path('./utils/data/gemeindestaende.pkl')
 TARGET_PATH = Path('../results')
 
 

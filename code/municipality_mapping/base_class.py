@@ -26,7 +26,7 @@ class BaseMunicipalityData:
         """
         self.api_path = 'https://www.agvchapp.bfs.admin.ch/api/communes'  # noqa
         self.base_path = Path(__file__).resolve().parent / 'data'
-        
+
         if which_data == 'code_mapping':
             self.data, self.gmde_dct = self._fetch_base_data(which_data, start_date)
             self.all_historical_bfs_codes = set()
@@ -34,8 +34,9 @@ class BaseMunicipalityData:
                 self.all_historical_bfs_codes.update(name_dct.keys())
         elif which_data == 'name_matching':
             self.officials = self._fetch_base_data(which_data, start_date)
-            self.officials = self.officials.rename(
-                columns={'bfs_gmde_code': 'matched_id', 'bfs_gmde_name': 'matched_name'}
+            self.officials = (
+                self.officials
+                .rename(columns={'bfs_gmde_code': 'matched_id', 'bfs_gmde_name': 'matched_name'})
             )
         else:
             raise ValueError("The variable which_data can only be `code_mapping`or `name_matching`.")
@@ -68,7 +69,7 @@ class BaseMunicipalityData:
         unique_dates.sort(key=lambda date: datetime.strptime(date, "%d-%m-%Y"))
 
         print(
-            f"Found {len(unique_dates)} Gemeindestände since 01-01-1981!"
+            f"Found {len(unique_dates)} Gemeindestände since {start_date}!"
             f"Latest: {unique_dates[-1]}"
         )
 
@@ -98,10 +99,12 @@ class BaseMunicipalityData:
 
         elif which_data == 'name_matching':
             snapshots_combined = pd.concat(snapshots)
+
             snapshots_combined = (
                 snapshots_combined
                 .rename(columns={'Name': 'bfs_gmde_name', 'BfsCode': 'bfs_gmde_code'})
-                .sort_values(['bfs_gmde_name', 'gmde_stand'])
+                .sort_values(['gmde_stand'],
+                             key=lambda col: pd.to_datetime(col, format='%d-%m-%Y'))
                 .drop_duplicates(subset=['bfs_gmde_name'], keep='last')
                 .filter(['bfs_gmde_name', 'bfs_gmde_code', 'gmde_stand'])
             )
@@ -125,7 +128,13 @@ class BaseMunicipalityData:
             official_names = pd.concat([snapshots_combined, ambiguous_grouped])
 
             try:
-                common_names = pd.read_csv(self.base_path / 'common_names_updated_20-11-2024.csv')
+                common_names = pd.read_csv(self.base_path / 'common_names.csv')
+                common_names = common_names.merge(official_names, on='bfs_gmde_name')
+                common_names = (
+                    common_names
+                    .filter(['name_variant', 'bfs_gmde_code', 'gmde_stand'])
+                    .rename(columns={'name_variant': 'bfs_gmde_name'})
+                )
                 official_names = pd.concat([official_names, common_names])
             except FileNotFoundError as e:
                 print(

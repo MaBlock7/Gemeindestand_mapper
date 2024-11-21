@@ -371,7 +371,7 @@ class MunicipalityNameMatcher(BaseMunicipalityData):
 
         merged_df = query_df.merge(self.officials, on='normalized', how='left')
 
-        exact_matches = merged_df[~merged_df.matched_id.isna()].copy()
+        exact_matches = merged_df[~merged_df.matched_id.isna()].drop(columns=['gmde_stand']).copy()
         exact_matches['matched_name'] = exact_matches.normalized
         print(f"Found {len(exact_matches)} exact matches!")
 
@@ -392,4 +392,14 @@ class MunicipalityNameMatcher(BaseMunicipalityData):
             no_matches.progress_apply(match_apply, axis=1)
         )
 
-        return pd.concat([exact_matches, no_matches], axis=0)
+        results_df = pd.concat([exact_matches, no_matches])
+        results_df = (
+            results_df
+            .merge(
+                self.officials[['matched_id', 'gmde_stand']],
+                on='matched_id',
+                how='left'
+            )
+            .rename(columns={'gmde_stand': 'gmde_stand_original'})
+        )
+        return results_df

@@ -543,12 +543,13 @@ class MunicipalityCodeMapper(BaseMunicipalityData):
         newest = date_strings[-1]
 
         df[f'bfs_gmde_code_{newest}'] = pd.NA
-
+        df[f'bfs_gmde_code_{newest}'] = df[f'bfs_gmde_code_{newest}'].astype(str)
+        df[code_column] = df[code_column].apply(lambda x: str(int(x)) if pd.notna(x) else pd.NA)
         origins = date_strings[:-1]
 
         connector = aiohttp.TCPConnector(limit=20)
         async with aiohttp.ClientSession(connector=connector) as session:
-            tasks = [self.fetch_mapping(session, origin, newest) for origin in origins]
+            tasks = [self._fetch_mapping(session, origin, newest) for origin in origins]
             mappings = await asyncio.gather(*tasks)
 
         for origin, mapping in zip(origins, mappings):
@@ -564,11 +565,12 @@ class MunicipalityCodeMapper(BaseMunicipalityData):
             )
 
             df = df.merge(mapping, on=[stand_column, code_column], how='left')
-            df[f'bfs_gmde_code_{newest}'] = (
-                df[f'bfs_gmde_code_{newest}']
-                .fillna(df.pop(f'bfs_gmde_code_{newest}_update'))
-            )
 
-        df.loc[df[stand_column] == newest, f'bfs_gmde_code_{newest}'] = df[code_column]
+            df.loc[~df[f'bfs_gmde_code_{newest}_update'].isna(), f'bfs_gmde_code_{newest}'] = df[f'bfs_gmde_code_{newest}_update'].astype(str)
+            df = df.drop(columns=[f'bfs_gmde_code_{newest}_update'])
+
+        df.loc[df[stand_column] == newest, f'bfs_gmde_code_{newest}'] = (
+            df[code_column].astype(str)
+        )
 
         return df

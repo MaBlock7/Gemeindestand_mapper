@@ -1,5 +1,0 @@
-Im Ordner 1.1 finden Sie die Dateien nach Version 1.1 des Standards eCH-0071 mit den Gemeinden ab dem 1. Januar 1960, während Sie im Ordner 1.2 IMPLEMENTED PROPOSAL die Version 1.2 desselben Standards, aber mit den Gemeinden ab dem 12. September 1848, finden.
-
-Dans le dossier 1.1 vous trouverez les fichiers selon la version 1.1 du standard eCH-0071 avec les communes à partir du 1er janvier 1960, tandis que dans le dossier 1.2 IMPLEMENTED PROPOSAL vous trouverez la version 1.2 du même standard, mais avec les communes à partir du 12 septembre 1848.
-
-Nella cartella 1.1 troverete i file secondo la versione 1.1 dello standard eCH-0071 con i Comuni a partire dal 1° gennaio 1960, mentre nella cartella 1.2 IMPLEMENTED PROPOSAL troverete la version 1.2 del medesimo standard, ma con i Comuni a partire dal 12 settembre 1848.

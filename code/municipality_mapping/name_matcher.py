@@ -81,6 +81,10 @@ class MunicipalityNameMatcher(BaseMunicipalityData):
         self.officials['normalized'] = self.officials['matched_name'].apply(
             self.normalize_text
         )
+
+        # Drop Municipalities with the same normalized name (they are the same) and keep the more recent Gemeindestand
+        self.officials = self.officials.drop_duplicates(subset=['normalized'], keep='last')
+
         self.officials['no_brackets'] = (
             self.officials['normalized'].str.replace(
                 r'\(|\)', '', regex=True)
@@ -377,7 +381,7 @@ class MunicipalityNameMatcher(BaseMunicipalityData):
         """
         # Try exact matches via normalized names
         query_df['normalized'] = query_df[query_column].apply(self.normalize_text)
-        query_df = query_df.drop_duplicates(subset=['normalized'])
+        # query_df = query_df.drop_duplicates(subset=['normalized'])
 
         merged_df = query_df.merge(self.officials, on='normalized', how='left')
         exact_matches = merged_df[~merged_df.matched_id.isna()].drop(columns=['gmde_stand']).copy()

@@ -544,7 +544,7 @@ class MunicipalityCodeMapper(BaseMunicipalityData):
 
         df[f'bfs_gmde_code_{newest}'] = pd.NA
         df[f'bfs_gmde_code_{newest}'] = df[f'bfs_gmde_code_{newest}'].astype(str)
-        df[code_column] = df[code_column].apply(lambda x: str(int(x)) if pd.notna(x) else pd.NA)
+        df[code_column] = df[code_column].apply(lambda x: str(int(x)) if (',' not in str(x) and pd.notna(x)) else pd.NA)
         origins = date_strings[:-1]
 
         connector = aiohttp.TCPConnector(limit=20)

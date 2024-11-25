@@ -100,7 +100,7 @@ class MunicipalityNameMatcher(BaseMunicipalityData):
         )
 
         # Create TF-IDF matrix for official names
-        self.tfidf = TfidfVectorizer(analyzer='char', ngram_range=(2, 3))
+        self.tfidf = TfidfVectorizer(analyzer='char', ngram_range=(1, 2))
         self.tfidf_matrix = self.tfidf.fit_transform(self.officials['normalized'])
 
         # Create ngram index
@@ -162,6 +162,7 @@ class MunicipalityNameMatcher(BaseMunicipalityData):
             ' u.': ' und',
             ' z.': ' zur',
             'st-': 'saint-',
+            'st.': 'st. ',
             'dev-': 'devant-',
             ' avec': '',
             "'": " ",
@@ -237,7 +238,8 @@ class MunicipalityNameMatcher(BaseMunicipalityData):
     def match_name(
         self,
         query_normalized: str,
-        threshold: float = 0.85
+        threshold: float = 0.85,
+        single_name_use: bool = False
     ) -> tuple[Union[int, None], Union[str, None], float]:
         """
         Match a single name against official municipalities.
@@ -250,9 +252,17 @@ class MunicipalityNameMatcher(BaseMunicipalityData):
         :type query_normalized: str
         :param threshold: Minimum confidence score to accept a match.
         :type threshold: float
+        :param single_name_use: If used as a direct method and not within match_dataframe.
+        :type single_name_use: bool
         :return: Tuple containing matched ID, matched name, and confidence score.
         :rtype: Tuple[Union[int, None], Union[str, None], float]
         """
+        if single_name_use:
+            stripped_query_normalized = query_normalized.replace('(', '').replace(')', '')
+            result = self.exact_matches.get(stripped_query_normalized)
+            if result:
+                return result
+
         # Fix common mistakes
         query_normalized = self.common_mistakes.get(query_normalized, query_normalized)
 
@@ -310,9 +320,9 @@ class MunicipalityNameMatcher(BaseMunicipalityData):
 
             # Combine scores with weights
             combined_score = (
-                0.4 * tfidf_sim +
-                0.3 * lev_ratio +
-                0.1 * part_ratio +
+                0.1 * tfidf_sim +
+                0.4 * lev_ratio +
+                0.3 * part_ratio +
                 0.1 * token_sort +
                 0.1 * jaro_sim
             )
@@ -333,7 +343,7 @@ class MunicipalityNameMatcher(BaseMunicipalityData):
                 r'\b\(fr\)\b', r'\b\(lu\)\b', r'\b\(be\)\b', r'\b\(gr\)\b',
                 r'\b\(ar\)\b', r'\b\(ge\)\b', r'\b\(sg\)\b', r'\bfra\b', r'\bdeu\b'
             ]
-            if re.match('|'.join(unmatched_patterns), query_normalized):
+            if re.search('|'.join(unmatched_patterns), query_normalized):
                 return -1, None, 1.0
             return 0, None, 0.0
 
@@ -370,7 +380,6 @@ class MunicipalityNameMatcher(BaseMunicipalityData):
         query_df = query_df.drop_duplicates(subset=['normalized'])
 
         merged_df = query_df.merge(self.officials, on='normalized', how='left')
-
         exact_matches = merged_df[~merged_df.matched_id.isna()].drop(columns=['gmde_stand']).copy()
         exact_matches['matched_name'] = exact_matches.normalized
         print(f"Found {len(exact_matches)} exact matches!")

@@ -114,6 +114,12 @@ common (inofficial) names of municipalities such as `Zugo` for `Zug` or `Zurich`
 
 This file should be updated by newer versions if neccessary.
 
+### 4. Run Tests
+
+   ```bash
+   python -m municipality_mapping.tests.test_municipality_matcher
+   ```
+
 ## Data Source
 
 - **API**: [Swiss Federal Statistical Office API](https://www.agvchapp.bfs.admin.ch/de/mutated-communes/query)  

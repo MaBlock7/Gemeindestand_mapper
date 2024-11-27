@@ -52,6 +52,16 @@ This project provides tools for matching Swiss municipality names to their offic
 ### 1. Municipality Name Matcher
 
 The `MunicipalityNameMatcher` class allows matching of municipality names against official BFS data.
+If the names contain foreign names indicated by `(DE)`, `(FR)`, etc. or ambiguous municipality names, e.g.
+`Buchs`instead of either `Buchs SG`, `Buchs (ZH)`, or `Buchs (AG)`, the following codes are used as indicators:
+
+| CODES    | MEANING                 |
+|----------|-------------------------|
+| 1-7000   | Official BFS Codes      |
+| 0        | No Match                |
+| -1       | Foreign Territory       |
+| -2       | Ambiguous Name          |
+
 
 #### Example Usage:
 ```python

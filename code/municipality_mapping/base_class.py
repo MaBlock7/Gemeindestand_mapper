@@ -69,7 +69,7 @@ class BaseMunicipalityData:
         unique_dates.sort(key=lambda date: datetime.strptime(date, "%d-%m-%Y"))
 
         print(
-            f"Found {len(unique_dates)} Gemeindestände since {start_date}!"
+            f"Found {len(unique_dates)} Gemeindestände since {start_date}! "
             f"Latest: {unique_dates[-1]}"
         )
 
@@ -122,8 +122,10 @@ class BaseMunicipalityData:
                     'bfs_gmde_code': lambda x: ', '.join(x.tolist()),
                     'gmde_stand': lambda x: ', '.join(x.tolist())
                 })
+                .rename(columns={'bfs_gmde_code': 'candidate_codes'})
                 .reset_index()
             )
+            ambiguous_grouped['bfs_gmde_code'] = -2
 
             official_names = pd.concat([snapshots_combined, ambiguous_grouped])
 
@@ -138,7 +140,7 @@ class BaseMunicipalityData:
                 official_names = pd.concat([official_names, common_names])
             except FileNotFoundError as e:
                 print(
-                    "Common name variants file not found, proceeding without."
+                    "Common name variants file not found, proceeding without. "
                     f"Output: {e}"
                 )
 

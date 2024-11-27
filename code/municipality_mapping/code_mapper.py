@@ -520,16 +520,18 @@ class MunicipalityCodeMapper(BaseMunicipalityData):
     async def map_multiple_gemeindestaende_to_newest(
         self,
         df: pd.DataFrame,
-        code_column: str,
+        code_column: int,
         stand_column: str
     ) -> pd.DataFrame:
         """
-        Map multiple Gemeindestände in the DataFrame to the newest Gemeindestand.
+        If one has a column containing BFS codes from different states, this method
+        can be used to map those to the latest Gemeindestand. For this it requires
+        a column with the Gemeindestand of the respective row in the format `dd-mm-YY`.
 
         :param df: The DataFrame containing municipality data.
         :type df: pd.DataFrame
         :param code_column: The column containing BFS codes.
-        :type code_column: str
+        :type code_column: int
         :param stand_column: The column containing Gemeindestand dates.
         :type stand_column: str
         :return: The DataFrame with codes mapped to the newest Gemeindestand.
@@ -537,14 +539,13 @@ class MunicipalityCodeMapper(BaseMunicipalityData):
         """
         gemeindestaende = df[~df[stand_column].isna()][stand_column].unique()
         date_strings = sorted(
-            [date for date in gemeindestaende if ', ' not in date],
+            [date for date in gemeindestaende],
             key=lambda x: datetime.strptime(x, "%d-%m-%Y")
         )
         newest = date_strings[-1]
 
-        df[f'bfs_gmde_code_{newest}'] = pd.NA
-        df[f'bfs_gmde_code_{newest}'] = df[f'bfs_gmde_code_{newest}'].astype(str)
-        df[code_column] = df[code_column].apply(lambda x: str(int(x)) if (',' not in str(x) and pd.notna(x)) else pd.NA)
+        df[f'bfs_gmde_code_{newest}'] = 0
+        df[code_column] = df[code_column].fillna(0).astype(int)
         origins = date_strings[:-1]
 
         connector = aiohttp.TCPConnector(limit=20)
@@ -559,18 +560,14 @@ class MunicipalityCodeMapper(BaseMunicipalityData):
                 f'bfs_gmde_code_{newest}_update'
             ]
             mapping[stand_column] = origin
-            mapping[code_column] = mapping[code_column].astype(str)
-            mapping[f'bfs_gmde_code_{newest}_update'] = (
-                mapping[f'bfs_gmde_code_{newest}_update'].astype(str)
-            )
+            mapping[code_column] = mapping[code_column].astype(int)
+            mapping[f'bfs_gmde_code_{newest}_update'] = mapping[f'bfs_gmde_code_{newest}_update'].astype(int)
 
             df = df.merge(mapping, on=[stand_column, code_column], how='left')
 
-            df.loc[~df[f'bfs_gmde_code_{newest}_update'].isna(), f'bfs_gmde_code_{newest}'] = df[f'bfs_gmde_code_{newest}_update'].astype(str)
+            df.loc[~df[f'bfs_gmde_code_{newest}_update'].isna(), f'bfs_gmde_code_{newest}'] = df[f'bfs_gmde_code_{newest}_update']
             df = df.drop(columns=[f'bfs_gmde_code_{newest}_update'])
 
-        df.loc[df[stand_column] == newest, f'bfs_gmde_code_{newest}'] = (
-            df[code_column].astype(str)
-        )
+        df.loc[df[stand_column] == newest, f'bfs_gmde_code_{newest}'] = df[code_column]
 
         return df

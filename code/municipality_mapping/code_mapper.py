@@ -517,7 +517,7 @@ class MunicipalityCodeMapper(BaseMunicipalityData):
             how='left'
         )
 
-    async def map_multiple_gemeindestaende_to_newest(
+    async def map_multiple_gemeindestaende_to_latest(
         self,
         df: pd.DataFrame,
         code_column: int,

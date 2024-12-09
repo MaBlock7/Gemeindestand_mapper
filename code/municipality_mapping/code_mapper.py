@@ -121,7 +121,8 @@ class MunicipalityCodeMapper(BaseMunicipalityData):
                 wrong_codes_dict[int(code)] = (
                     df.loc[df[code_column] == code, name_column].values[0]
                 )
-        return gemeinde_set, wrong_codes_dict
+            return gemeinde_set, wrong_codes_dict
+        return gemeinde_set, dict()
 
     def _correct_wrong_codes(
         self, inferred_gmde_stand: str, wrong_codes_dict: dict

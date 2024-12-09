@@ -381,15 +381,16 @@ class MunicipalityNameMatcher(BaseMunicipalityData):
         """
         # Try exact matches via normalized names
         query_df['normalized'] = query_df[query_column].apply(self.normalize_text)
-
+        print(len(query_df))
         merged_df = query_df.merge(self.officials, on='normalized', how='left')
-
+        print(len(merged_df))
         exact_matches = merged_df[~merged_df.matched_id.isna()].drop(columns=['gmde_stand']).copy()
         exact_matches['matched_name'] = exact_matches.normalized
         print(f"Found {len(exact_matches)} exact matches!")
 
         # Apply advanced matching to unmatched entries
-        no_matches = merged_df[merged_df.matched_id.isna()][[query_column, 'normalized']].copy()
+        no_matches = merged_df[merged_df.matched_id.isna()].drop(columns=['gmde_stand'])
+        to_match = no_matches[[query_column, 'normalized']].copy()
         # Apply the function
         def match_apply(row):
             match = self.match_name(row.normalized, threshold)
@@ -400,10 +401,16 @@ class MunicipalityNameMatcher(BaseMunicipalityData):
             })
 
         tqdm.pandas(desc=f'Matching {len(no_matches)} names')
-        no_matches[['matched_id', 'matched_name', 'confidence']] = (
-            no_matches.progress_apply(match_apply, axis=1)
+        to_match[['matched_id', 'matched_name', 'confidence']] = (
+            to_match.progress_apply(match_apply, axis=1)
         )
-        concat_df = pd.concat([exact_matches, no_matches])
+
+        original_columns = [col for col in no_matches if col not in to_match.columns]
+        no_matches = pd.concat([no_matches[original_columns], to_match], axis=1)
+
+        concat_df = pd.concat([no_matches, exact_matches])
+        concat_df['temp_index'] = list(range(len(concat_df)))
+        print(concat_df.columns)
         df_a = (
             concat_df[~concat_df.confidence.between(0.0, 1.0, inclusive='neither')]
             .merge(
@@ -417,9 +424,12 @@ class MunicipalityNameMatcher(BaseMunicipalityData):
                 self.officials[['matched_id', 'gmde_stand']],
                 on='matched_id',
                 how='left')
-            .drop_duplicates(subset=['normalized'], keep='last')
+            .drop_duplicates(subset=['temp_index'], keep='last')
         )
         result_df = pd.concat([df_a, df_b]).rename(columns={'gmde_stand': 'bfs_gmde_stand_origin', 'matched_id': 'bfs_gmde_code_origin'}).reset_index()
+        print(result_df.columns)
         result_df['bfs_gmde_code_origin'] = result_df['bfs_gmde_code_origin'].fillna(0).astype(int)
 
-        return result_df.filter(['municipality_name', 'normalized', 'bfs_gmde_stand_origin', 'bfs_gmde_code_origin', 'candidate_codes', 'confidence'])
+        new_columns = ['normalized', 'bfs_gmde_stand_origin', 'bfs_gmde_code_origin', 'candidate_codes', 'confidence']
+        original_columns = [col for col in query_df.columns if col not in new_columns]
+        return result_df.filter(original_columns + new_columns)
